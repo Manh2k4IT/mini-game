@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Thử Thách Đoán Giá Vải</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+  body {
+  font-family: 'Roboto', sans-serif;
+  background: 
+    url('https://cdn.shopify.com/s/files/1/0601/2449/5931/files/Untitled-6.jpg?v=1750991419') no-repeat center center fixed;
+  background-size: cover;
+  margin: 0;
+  padding: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+
+
+
+    #gameBox {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      padding: 30px;
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #b65c0c;
+    }
+
+    .intro-text {
+      background: #fff4d0;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      color: #5c3a07;
+      font-weight: bold;
+    }
+
+    .fabric-card {
+      margin-bottom: 30px;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      font-size: 1rem;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px 25px;
+      font-size: 1rem;
+      font-weight: bold;
+      background: #f39c12;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .result {
+      margin-top: 20px;
+      font-weight: bold;
+      min-height: 40px;
+    }
+
+    .wheel-container {
+      position: relative;
+      margin-top: 20px;
+      display: inline-block;
+    }
+
+    #wheelCanvas {
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      transition: transform 5s ease-out;
+      box-shadow: 0 0 8px rgba(0,0,0,0.2);
+      background: #fff;
+    }
+
+    /* Mũi tên nằm bên phải vòng quay, hướng vào trong (vị trí 3 giờ) */
+    #pointer {
+      width: 0;
+      height: 0;
+      border-top: 20px solid transparent;
+      border-bottom: 20px solid transparent;
+      border-left: 30px solid #e03e2f;
+      position: absolute;
+      top: 50%;
+      left: 100%;
+      transform: translateY(-50%) rotate(180deg);
+      z-index: 10;
+      user-select: none;
+      filter: drop-shadow(0 0 3px rgba(0,0,0,0.3));
+    }
+
+    #wheelResult {
+      font-weight: bold;
+      margin-top: 15px;
+      color: #a55200;
+      min-height: 1.4em;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameBox">
+    <h1>🧵 Thử Thách Đoán Giá Vải</h1>
+    <p class="intro-text">
+      📌 Nhập giá bạn đoán (VND). Đoán đúng hoặc gần đúng để nhận quà hấp dẫn!<br>(Tối đa 3 lần thử)
+    </p>
+
+    <div class="fabric-card" id="guessSection">
+      <img src="https://cdn.shopify.com/s/files/1/0601/2449/5931/files/2.webp?v=1750387045" alt="Vải Linen" width="100%" />
+      <p><strong>Tên:</strong> Vải Linen | <strong>Chất liệu:</strong> 100% Linen | <strong>Khổ:</strong> 1m4 | <strong>Định lượng:</strong> 180gsm</p>
+      <input type="number" id="guessPrice" placeholder="Nhập giá bạn đoán (VD: 1000000)" />
+      <button id="submitBtn" onclick="checkPrice()">Xem kết quả</button>
+      <div class="result" id="resultBox"></div>
+      <div id="attemptInfo">Bạn còn <span id="remaining">3</span> lần đoán</div>
+    </div>
+
+    <div class="fabric-card" id="luckyWheel" style="display:none;">
+      <h2>🎉 Vòng Quay May Mắn</h2>
+      <div class="wheel-container">
+        <canvas id="wheelCanvas" width="300" height="300"></canvas>
+        <div id="pointer"></div>
+      </div>
+      <button id="spinBtn" onclick="spinWheel()">🎲 Quay Ngay</button>
+      <div id="wheelResult"></div>
+    </div>
+  </div>
+
+  <script>
+    const prizes = [
+      "🎁 Mạnh 1",
+      "🎉 Mạnh 2",
+      "🧧 Mạnh 3",
+      "📦 Mạnh 4",
+      "😔 Thiện Mạnh",
+      "🎫 Thiện Mạnh 1"
+    ];
+    const totalSlices = prizes.length;
+    const arc = 2 * Math.PI / totalSlices;
+    let hasSpun = false;
+
+    // Vẽ vòng quay
+    const canvas = document.getElementById("wheelCanvas");
+    const ctx = canvas.getContext("2d");
+    const radius = canvas.width / 2;
+
+    function drawWheel() {
+      for (let i = 0; i < totalSlices; i++) {
+        const angle = i * arc;
+        ctx.beginPath();
+        ctx.moveTo(radius, radius);
+        ctx.arc(radius, radius, radius, angle, angle + arc);
+        ctx.fillStyle = i % 2 === 0 ? "#ffe0a1" : "#ffcc80";
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(radius, radius);
+        ctx.rotate(angle + arc / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#6b4709";
+        ctx.font = "bold 14px Roboto";
+        ctx.fillText(prizes[i], radius - 10, 5);
+        ctx.restore();
+      }
+    }
+    drawWheel();
+
+    // Xử lý đoán giá
+    const realPrice = 1000;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    function checkPrice() {
+      const guess = parseInt(document.getElementById("guessPrice").value);
+      const resultBox = document.getElementById("resultBox");
+      const remainingSpan = document.getElementById("remaining");
+      const submitBtn = document.getElementById("submitBtn");
+
+      if (isNaN(guess) || guess <= 0) {
+        resultBox.textContent = "⚠️ Vui lòng nhập giá hợp lệ!";
+        resultBox.className = "result error";
+        return;
+      }
+
+      attempts++;
+      const diff = Math.abs(guess - realPrice);
+      const tolerance = realPrice * 0.1;
+
+      if (diff === 0) {
+        resultBox.textContent = "🎯 Chính xác! Bạn đoán đúng 100%! Nhận mã ngay!";
+        resultBox.className = "result success";
+        submitBtn.disabled = true;
+        return;
+      } else if (diff <= tolerance) {
+        resultBox.textContent = "👌 Gần đúng! Bạn đủ điều kiện nhận quà 🎁";
+        resultBox.className = "result warning";
+      } else {
+        resultBox.textContent = "😢 Chưa đúng. Hãy thử lại!";
+        resultBox.className = "result error";
+      }
+
+      remainingSpan.textContent = maxAttempts - attempts;
+
+      if (attempts >= maxAttempts) {
+        submitBtn.disabled = true;
+        document.getElementById("attemptInfo").textContent = "🚫 Hết lượt đoán!";
+        document.getElementById("guessSection").style.display = "none";
+        document.getElementById("luckyWheel").style.display = "block";
+      }
+    }
+
+    // Xử lý vòng quay
+    function spinWheel() {
+      if (hasSpun) return;
+      hasSpun = true;
+
+      const spinBtn = document.getElementById("spinBtn");
+      spinBtn.disabled = true;
+      spinBtn.textContent = "Đang quay...";
+
+      const randomIndex = Math.floor(Math.random() * totalSlices);
+      const spinTimes = 5;
+      const degPerSlice = 360 / totalSlices;
+      const offset = degPerSlice / 2;
+      const rotateDeg = 360 * spinTimes + (360 - randomIndex * degPerSlice - offset);
+
+      canvas.style.transition = "transform 5s ease-out";
+      canvas.style.transform = `rotate(${rotateDeg}deg)`;
+
+      setTimeout(() => {
+        document.getElementById("wheelResult").textContent = `🎉 Chúc mừng! Bạn nhận được: ${prizes[randomIndex]}`;
+        spinBtn.textContent = "✅ Đã quay";
+      }, 5200);
+    }
+  </script>
+</body>
+</html>
